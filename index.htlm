@@ -1,0 +1,698 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>MST Calculators</title>
+<style>
+  :root {
+    color-scheme: dark; /* keeps dropdowns dark instead of that ugly white default */
+    --bg: #0a0a0b;
+    --surface: #131316;
+    --surface2: #1a1a1e;
+    --surface3: #201f24;
+    --border: #26262b;
+    --border-red: #4a2429;
+    --text: #f2f0ed;
+    --text-dim: #98959c;
+    --text-faint: #615f66;
+    --red: #e5484d;
+    --red-glow: rgba(229,72,77,0.10);
+    --red-row: rgba(229,72,77,0.08);
+    --green: #3fb968;
+    --green-row: rgba(63,185,104,0.10);
+    --mono: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+  }
+  * { box-sizing: border-box; }
+  body {
+    margin: 0;
+    background: var(--bg);
+    color: var(--text);
+    font-family: system-ui, -apple-system, sans-serif;
+  }
+  .wrap { max-width: 1100px; margin: 0 auto; padding: 22px 18px 44px; }
+
+  .brand { display: flex; align-items: center; justify-content: center; gap: 10px; margin-bottom: 16px; }
+  .brand .mark { width: 9px; height: 9px; background: var(--red); transform: rotate(45deg); }
+  .brand h1 { font-size: 18px; font-weight: 600; margin: 0; }
+  .tabs { display: flex; justify-content: center; gap: 8px; margin-bottom: 18px; border-bottom: 1px solid var(--border); padding-bottom: 12px; }
+  .tab-btn {
+    padding: 7px 15px; border-radius: 7px; border: 1px solid var(--border);
+    background: transparent; color: var(--text-dim); font-size: 13px; font-weight: 500; cursor: pointer;
+  }
+  .tab-btn.active { border-color: var(--red); background: var(--red); color: #150506; }
+  .tab-panel { display: none; }
+  .tab-panel.active { display: block; }
+
+  .layout { display: flex; flex-wrap: wrap; gap: 14px; }
+  .col-input { flex: 1 1 270px; height: fit-content; }
+  .col-output { flex: 2 1 480px; display: flex; flex-direction: column; gap: 14px; }
+  .card {
+    background: var(--surface); border: 1px solid var(--border);
+    border-radius: 10px; padding: 14px 16px;
+  }
+  .section-label { font-size: 12px; color: var(--red); margin-bottom: 10px; font-weight: 600; }
+  .field { display: flex; flex-direction: column; gap: 5px; margin-bottom: 10px; }
+  .field:last-child { margin-bottom: 0; }
+  .field span.label { font-size: 12.5px; color: var(--text-dim); }
+  .field-box {
+    display: flex; align-items: center; background: var(--surface2);
+    border: 1px solid var(--border); border-radius: 7px; padding: 7px 10px;
+  }
+  .field-box input, .field-box select {
+    background: transparent; border: none; outline: none; color: var(--text);
+    width: 100%; font-size: 13px; font-family: var(--mono);
+  }
+  .field-box select {
+    font-family: system-ui, sans-serif;
+    background-color: var(--surface2);
+    color: var(--text);
+    appearance: none;
+    -webkit-appearance: none;
+    -moz-appearance: none;
+    padding-right: 16px;
+    background-image:
+      linear-gradient(45deg, transparent 50%, var(--text-dim) 50%),
+      linear-gradient(135deg, var(--text-dim) 50%, transparent 50%);
+    background-position: calc(100% - 12px) 55%, calc(100% - 7px) 55%;
+    background-size: 5px 5px, 5px 5px;
+    background-repeat: no-repeat;
+  }
+  .field-box select option { background-color: var(--surface2); color: var(--text); }
+  .field-box .suffix { color: var(--text-faint); font-size: 12px; margin-left: 6px; white-space: nowrap; }
+  .field-row { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; }
+  .field-row-3 { display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 8px; }
+  .toggle-btn {
+    display: flex; align-items: center; gap: 8px; background: var(--surface2);
+    border: 1px solid var(--border); border-radius: 7px; padding: 7px 10px;
+    color: var(--text-dim); font-size: 13px; cursor: pointer; width: 100%;
+  }
+  .toggle-btn.on { border-color: var(--border-red); color: var(--red); }
+  .toggle-track { width: 28px; height: 16px; border-radius: 999px; background: #333338; position: relative; flex-shrink: 0; }
+  .toggle-btn.on .toggle-track { background: var(--red); }
+  .toggle-thumb {
+    position: absolute; top: 2px; left: 2px; width: 12px; height: 12px;
+    border-radius: 50%; background: #0a0a0b; transition: left 0.15s;
+  }
+  .toggle-btn.on .toggle-thumb { left: 14px; }
+
+  /* boxed sub-section, just to visually split stuff up a bit without another whole card */
+  .boxed-section {
+    border: 1px solid var(--border); background: var(--surface3);
+    border-radius: 8px; padding: 10px 11px; margin-top: 12px;
+  }
+  .boxed-section > .boxed-title { font-size: 12.5px; color: var(--text-dim); display: block; margin-bottom: 8px; }
+
+  /* ore-group row inside the refinery box - all ores of one planet fit on one line,
+     styled the same as the regular field/field-box combo used elsewhere */
+  .ore-group-row { display: grid; gap: 8px; margin-bottom: 8px; }
+  .ore-group-row:last-child { margin-bottom: 0; }
+
+  .stat-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(122px, 1fr)); gap: 9px; }
+  .stat {
+    background: var(--surface2); border: 1px solid var(--border);
+    border-radius: 8px; padding: 9px 11px;
+  }
+  .stat.accent { border-color: var(--border-red); }
+  .stat .label { font-size: 11px; color: var(--text-dim); margin-bottom: 4px; }
+  .stat .value { font-family: var(--mono); font-size: 15px; font-weight: 600; color: var(--text); }
+  .stat.accent .value { color: var(--red); }
+  .stat .sub { font-size: 10px; color: var(--text-faint); margin-top: 3px; }
+  .pills { display: flex; gap: 6px; flex-wrap: wrap; }
+  .pill {
+    padding: 6px 12px; border-radius: 999px; font-size: 12.5px;
+    border: 1px solid var(--border); background: transparent; color: var(--text-dim); cursor: pointer;
+  }
+  .pill.active { border-color: var(--red); background: var(--red-glow); color: var(--red); }
+  table { width: 100%; border-collapse: collapse; font-size: 12px; }
+  th { text-align: right; color: var(--text-dim); font-weight: 500; padding: 6px 8px; border-bottom: 1px solid var(--border); white-space: nowrap; }
+  th:first-child { text-align: left; }
+  td { padding: 6px 8px; border-bottom: 1px solid var(--border); text-align: right; color: var(--text-dim); font-family: var(--mono); font-size: 11.5px; }
+  td:first-child { text-align: left; color: var(--text); font-family: system-ui, sans-serif; font-size: 12px; }
+
+  /* green = best on the whole planet, red = best for that one ore */
+  tr.row-best-overall td { background: var(--green-row); }
+  tr.row-best-overall td.hl { color: var(--green); font-weight: 600; }
+  tr.row-best-in-ore td { background: var(--red-row); }
+  tr.row-best-in-ore td.hl { color: var(--red); font-weight: 600; }
+  /* clear break where one ore's rows end and the next ore's rows start */
+  tr.ore-break td { border-top: 3px solid var(--text-faint); padding-top: 10px; }
+
+  .table-scroll { overflow-x: auto; }
+  .footnote { font-size: 11px; color: var(--text-faint); line-height: 1.5; }
+  @media (max-width: 700px) {
+    .layout { flex-direction: column; }
+  }
+</style>
+</head>
+<body>
+<div class="wrap">
+  <div class="brand"><div class="mark"></div><h1>MST Calculators</h1></div>
+  <div class="tabs" id="tabs">
+    <button class="tab-btn active" data-tab="pve">T5 PvE</button>
+    <button class="tab-btn" data-tab="profit">Mining Profit</button>
+    <button class="tab-btn" data-tab="pets">Pets</button>
+  </div>
+
+  <div class="tab-panel active" id="panel-pve"></div>
+  <div class="tab-panel" id="panel-profit"></div>
+  <div class="tab-panel" id="panel-pets"></div>
+</div>
+
+<script>
+/* random helpers i use everywhere, nothing special */
+
+function displayNum(value, decimals) {
+  decimals = decimals || 0;
+  if (value === "" || value === null || value === undefined || !isFinite(value)) return "—";
+  return value.toLocaleString("en-US", { minimumFractionDigits: decimals, maximumFractionDigits: decimals });
+}
+
+function displayPct(value, decimals) {
+  decimals = decimals === undefined ? 1 : decimals;
+  if (!isFinite(value)) return "—";
+  return (value * 100).toLocaleString("en-US", { minimumFractionDigits: decimals, maximumFractionDigits: decimals }) + "%";
+}
+
+// spits out a <table>. opts can have overallBestRow / oreBestRows / oreBreakRows / highlightCol
+function renderTable(headers, rows, opts) {
+  opts = opts || {};
+  var oreBestRows = opts.oreBestRows || [];
+  var oreBreakRows = opts.oreBreakRows || [];
+  var out = '<div class="table-scroll"><table><thead><tr>';
+  headers.forEach(function (h) { out += '<th>' + h + '</th>'; });
+  out += '</tr></thead><tbody>';
+
+  rows.forEach(function (row, rowIdx) {
+    var classes = [];
+    if (oreBreakRows.indexOf(rowIdx) !== -1) classes.push('ore-break');
+    if (rowIdx === opts.overallBestRow) classes.push('row-best-overall');
+    else if (oreBestRows.indexOf(rowIdx) !== -1) classes.push('row-best-in-ore');
+
+    out += '<tr' + (classes.length ? ' class="' + classes.join(' ') + '"' : '') + '>';
+    row.forEach(function (cellValue, colIdx) {
+      out += '<td' + (colIdx === opts.highlightCol ? ' class="hl"' : '') + '>' + cellValue + '</td>';
+    });
+    out += '</tr>';
+  });
+
+  out += '</tbody></table></div>';
+  return out;
+}
+
+function statTile(label, value, accented, footnote) {
+  return '<div class="stat' + (accented ? ' accent' : '') + '">' +
+    '<div class="label">' + label + '</div>' +
+    '<div class="value">' + value + '</div>' +
+    (footnote ? '<div class="sub">' + footnote + '</div>' : '') +
+    '</div>';
+}
+
+// saves your inputs to the browser so they're still there next time you open the page
+function saveState(key, state) {
+  try { localStorage.setItem(key, JSON.stringify(state)); } catch (e) { /* meh, whatever */ }
+}
+function loadState(key, defaults) {
+  try {
+    var saved = localStorage.getItem(key);
+    if (!saved) return defaults;
+    return Object.assign({}, defaults, JSON.parse(saved));
+  } catch (e) {
+    return defaults;
+  }
+}
+
+/* tab clicking */
+document.getElementById('tabs').addEventListener('click', function (evt) {
+  var clicked = evt.target.closest('.tab-btn');
+  if (!clicked) return;
+  var targetTab = clicked.dataset.tab;
+  document.querySelectorAll('.tab-btn').forEach(function (btn) { btn.classList.toggle('active', btn === clicked); });
+  document.querySelectorAll('.tab-panel').forEach(function (panel) { panel.classList.remove('active'); });
+  document.getElementById('panel-' + targetTab).classList.add('active');
+});
+
+/* ============================
+   TAB 1 - T5 PvE
+   ============================ */
+
+var WEAPON_DAMAGE = {
+  "Volcanic pickaxe": 260000, "Basic Bludgeon": 285000, "Handy Bludgeon": 320000,
+  "Advanced Bludgeon": 355000, "Hefty Bludgeon": 390000, "Expert Bludgeon": 425000,
+  "Deadly Bludgeon": 460000, "Fleshripper Bludgeon": 500000
+};
+
+var MOB_LIST = [
+  { name: "Corruptonaut", hp: 20000000, ash: 33000, perT4: 110, perT5: 2000 },
+  { name: "Stardust Wizard", hp: 50000000, ash: 95000, perT4: 40, perT5: 550 },
+  { name: "Space Pirate", hp: 175000000, ash: 380000, perT4: 15, perT5: 140 },
+  { name: "Galactc Terror", hp: 500000000, ash: 1250000, perT4: 6, perT5: 40 },
+  { name: "Celestial emperor", hp: 2500000000, ash: 7200000, perT4: 2, perT5: 12 }
+];
+
+var DROP_GOALS = { tali: 10000, drop1: 5000, drop2: 20000 };
+
+var combatState = loadState('mst_combat_state', {
+  weapon: "Volcanic pickaxe", cps: 5, upgrade: 0, autumn: false, dragonLvl: 1, serpentLvl: 1, mobIdx: 0
+});
+
+function buildCombatPanel() {
+  var panel = document.getElementById('panel-pve');
+  var weaponOptionsHtml = Object.keys(WEAPON_DAMAGE).map(function (weaponName) {
+    return '<option value="' + weaponName + '"' + (weaponName === combatState.weapon ? ' selected' : '') + '>' + weaponName + '</option>';
+  }).join('');
+  var mobPillsHtml = MOB_LIST.map(function (mob, idx) {
+    return '<button class="pill' + (idx === combatState.mobIdx ? ' active' : '') + '" data-mob="' + idx + '">' + mob.name + '</button>';
+  }).join('');
+
+  panel.innerHTML =
+    '<div class="layout">' +
+      '<div class="card col-input">' +
+        '<div class="section-label">Loadout</div>' +
+        '<div class="field"><span class="label">Weapon</span><div class="field-box"><select id="pve-weapon">' + weaponOptionsHtml + '</select></div></div>' +
+        '<div class="field-row">' +
+          '<div class="field"><span class="label">Hit speed</span><div class="field-box"><input type="number" id="pve-cps" step="0.1" value="' + combatState.cps + '"><span class="suffix">cps</span></div></div>' +
+          '<div class="field"><span class="label">PvE upgrade</span><div class="field-box"><input type="number" id="pve-upgrade" step="1" value="' + combatState.upgrade + '"><span class="suffix">%</span></div></div>' +
+        '</div>' +
+        '<div class="field"><span class="label">Autumn event active</span>' +
+          '<button class="toggle-btn' + (combatState.autumn ? ' on' : '') + '" id="pve-autumn"><span class="toggle-track"><span class="toggle-thumb"></span></span><span id="pve-autumn-label">' + (combatState.autumn ? 'Yes' : 'No') + '</span></button>' +
+        '</div>' +
+        '<div class="field-row">' +
+          '<div class="field"><span class="label">Dragon level</span><div class="field-box"><input type="number" id="pve-dragon" step="1" min="0" value="' + combatState.dragonLvl + '"></div></div>' +
+          '<div class="field"><span class="label">Serpent level</span><div class="field-box"><input type="number" id="pve-serpent" step="1" min="0" value="' + combatState.serpentLvl + '"></div></div>' +
+        '</div>' +
+        '<div class="boxed-section" id="pve-damage-stats"></div>' +
+      '</div>' +
+      '<div class="col-output">' +
+        '<div class="card"><div class="section-label">Target</div><div class="pills" id="pve-mob-pills">' + mobPillsHtml + '</div><div class="stat-grid" id="pve-mob-stats" style="margin-top:11px;"></div></div>' +
+        '<div class="card"><div class="section-label">Ash & keys per hour</div><div id="pve-ash-table"></div></div>' +
+        '<div class="card"><div class="section-label">Hours to drop</div><div id="pve-drop-table"></div></div>' +
+        '<div class="footnote">These figures assume every drop lands exactly on the stated kill count. Real drop rates are probabilistic, so actual results will vary from these estimates.</div>' +
+      '</div>' +
+    '</div>';
+
+  document.getElementById('pve-weapon').addEventListener('change', function (e) { combatState.weapon = e.target.value; refreshCombatPanel(); });
+  document.getElementById('pve-cps').addEventListener('input', function (e) { combatState.cps = Number(e.target.value) || 0; refreshCombatPanel(); });
+  document.getElementById('pve-upgrade').addEventListener('input', function (e) { combatState.upgrade = Number(e.target.value) || 0; refreshCombatPanel(); });
+  document.getElementById('pve-dragon').addEventListener('input', function (e) { combatState.dragonLvl = Number(e.target.value) || 0; refreshCombatPanel(); });
+  document.getElementById('pve-serpent').addEventListener('input', function (e) { combatState.serpentLvl = Number(e.target.value) || 0; refreshCombatPanel(); });
+  document.getElementById('pve-autumn').addEventListener('click', function () {
+    combatState.autumn = !combatState.autumn;
+    this.classList.toggle('on', combatState.autumn);
+    document.getElementById('pve-autumn-label').textContent = combatState.autumn ? 'Yes' : 'No';
+    refreshCombatPanel();
+  });
+  document.getElementById('pve-mob-pills').addEventListener('click', function (e) {
+    var clicked = e.target.closest('.pill');
+    if (!clicked) return;
+    combatState.mobIdx = Number(clicked.dataset.mob);
+    document.querySelectorAll('#pve-mob-pills .pill').forEach(function (p) { p.classList.toggle('active', p === clicked); });
+    refreshCombatPanel();
+  });
+
+  refreshCombatPanel();
+}
+
+function refreshCombatPanel() {
+  saveState('mst_combat_state', combatState);
+
+  var baseDamage = WEAPON_DAMAGE[combatState.weapon];
+  var hitDamage = baseDamage * 2.05 * (1 + combatState.upgrade / 100) * (combatState.autumn ? 1.5 : 1);
+  var mob = MOB_LIST[combatState.mobIdx];
+  var hpWithSerpent = mob.hp * (1 - 0.0025 * combatState.serpentLvl);
+  var hitsNoPet = Math.ceil(mob.hp / hitDamage);
+  var hitsWithSerpent = Math.ceil(hpWithSerpent / hitDamage);
+  var killsPerHourNoPet = (combatState.cps / hitsNoPet) * 3600;
+  var killsPerHourDragon = killsPerHourNoPet * (1 + combatState.dragonLvl * 0.0025);
+  var killsPerHourSerpent = (combatState.cps / hitsWithSerpent) * 3600;
+  var petRows = [
+    { label: "No pet", kph: killsPerHourNoPet },
+    { label: "Dragon", kph: killsPerHourDragon },
+    { label: "Serpent", kph: killsPerHourSerpent }
+  ];
+
+  document.getElementById('pve-damage-stats').innerHTML =
+    statTile("Base damage", displayNum(baseDamage)) +
+    '<div style="height:8px"></div>' +
+    statTile("Total damage per hit", displayNum(Math.round(hitDamage)), true);
+
+  document.getElementById('pve-mob-stats').innerHTML =
+    statTile("HP", displayNum(mob.hp)) +
+    statTile("Hits to kill", displayNum(hitsNoPet)) +
+    statTile("Ash per kill", displayNum(mob.ash)) +
+    statTile("Kills per T4 key", displayNum(mob.perT4)) +
+    statTile("Kills per T5 key", displayNum(mob.perT5)) +
+    petRows.map(function (p) {
+      return statTile(p.label + " kills/hr", displayNum(Math.round(p.kph * 100) / 100, 2), p.label !== "No pet");
+    }).join('');
+
+  document.getElementById('pve-ash-table').innerHTML = renderTable(
+    ["Pet", "Ash/hr", "T4 keys/hr", "T5 keys/hr"],
+    petRows.map(function (p) {
+      return [p.label, displayNum(Math.round(p.kph * mob.ash)), displayNum(p.kph / mob.perT4, 3), displayNum(p.kph / mob.perT5, 3)];
+    })
+  );
+
+  document.getElementById('pve-drop-table').innerHTML = renderTable(
+    ["Pet", "Talisman (10,000)", "Drop #1 (5,000)", "Drop #2 (20,000)"],
+    petRows.map(function (p) {
+      return [p.label, displayNum(DROP_GOALS.tali / p.kph, 1), displayNum(DROP_GOALS.drop1 / p.kph, 1), displayNum(DROP_GOALS.drop2 / p.kph, 1)];
+    })
+  );
+}
+
+/* ============================
+   TAB 2 - Mining Profit
+   Moon, Mars, Sun ores. Sell price math is base -> refinery bonus
+   -> ram boost bump -> cash register bump, same order as the actual
+   game logic.
+   ============================ */
+
+var ORE_LIST = [
+  { name: "Basalt", priceBase: 75000, priceInc: 1875, haste: "moon", times: [1.5, 1.3, 1.2, 1.05, 1, 0.9] },
+  { name: "Brecca", priceBase: 40000, priceInc: 1000, haste: "moon", times: [0.75, 0.7, 0.65, 0.6, 0.55, 0.55] },
+  { name: "Regolith", priceBase: 180000, priceInc: 4500, haste: "mars", times: [3.3, 2.8, 2.45, 2.2, 2, 1.8] },
+  { name: "Amber Rock", priceBase: 88000, priceInc: 2200, haste: "mars", times: [1.5, 1.3, 1.2, 1.05, 1, 0.9] },
+  { name: "Amber Crystal", priceBase: 46000, priceInc: 1150, haste: "mars", times: [0.75, 0.7, 0.65, 0.6, 0.55, 0.55] },
+  { name: "Cosmic Fiber", priceBase: 95000, priceInc: 2375, haste: "sun", times: [1.5, 1.3, 1.2, 1.05, 1, 0.9] },
+  { name: "Crimson Plasma", priceBase: 68000, priceInc: 1700, haste: "sun", times: [0.75, 0.7, 0.65, 0.6, 0.55, 0.55] }
+];
+
+var TIER_LIST = [
+  { name: "Base", mult: 1, cost: 0 },
+  { name: "T1", mult: 2, cost: 128 },
+  { name: "T2", mult: 3, cost: 240 },
+  { name: "T3", mult: 4.5, cost: 540 },
+  { name: "T4", mult: 6, cost: 1296 }
+];
+
+var ORE_FRAGMENTS = {
+  "Basalt": [{ name: "Lunar Frag", div: 500 }, { name: "Basalt Shard", div: 1000 }, { name: "Chisilite Shard", div: 1000 }],
+  "Brecca": [{ name: "Lunar Frag", div: 500 }, { name: "Chisilite Shard", div: 1000 }, { name: "Brecca Powder", div: 2000 }],
+  "Regolith": [{ name: "Martian Dust", div: 500 }, { name: "Rhodnite", div: 2500 }, { name: "Regolith Soil", div: 200 }],
+  "Amber Rock": [{ name: "Amber Fragment", div: 500 }, { name: "Ametrine", div: 1000 }, { name: "Rhodnite", div: 2500 }],
+  "Amber Crystal": [{ name: "Amber Fragment", div: 500 }, { name: "Ametrine", div: 1000 }, { name: "Rhodnite", div: 2500 }],
+  "Cosmic Fiber": [{ name: "Sun Fragment", div: 500 }, { name: "Fiber", div: 1000 }],
+  "Crimson Plasma": [{ name: "Sun Fragment", div: 500 }, { name: "Plasma Shard", div: 2000 }]
+};
+
+var PLANET_ORES = {
+  "Moon": ["Basalt", "Brecca"],
+  "Mars": ["Regolith", "Amber Rock", "Amber Crystal"],
+  "Sun": ["Cosmic Fiber", "Crimson Plasma"]
+};
+
+// % that each ram level adds to your refinery bonus
+var RAM_PERCENT_PER_LEVEL = 0.02;
+var CASH_REGISTER_BONUS = 0.03;
+
+var miningState = loadState('mst_mining_state', {
+  fortune: 10000000,
+  refinery: { "Basalt": 0, "Brecca": 0, "Regolith": 0, "Amber Rock": 0, "Amber Crystal": 0, "Cosmic Fiber": 0, "Crimson Plasma": 0 },
+  hasteMoon: 1, hasteMars: 1, hasteSun: 1,
+  ramLevel: 0,
+  cashRegister: false,
+  potCost: 150, duration: 24, planet: "Moon"
+});
+
+function buildMiningPanel() {
+  var panel = document.getElementById('panel-profit');
+  var planetPillsHtml = Object.keys(PLANET_ORES).map(function (planetName) {
+    return '<button class="pill' + (planetName === miningState.planet ? ' active' : '') + '" data-planet="' + planetName + '">' + planetName + '</button>';
+  }).join('');
+
+  // refinery inputs grouped so every ore on the same planet sits on one row -
+  // no need to label which planet is which, the ore names already make it obvious
+  var refineryGroupsHtml = Object.keys(PLANET_ORES).map(function (planetName) {
+    var oresHere = PLANET_ORES[planetName];
+    var fieldsHtml = oresHere.map(function (oreName) {
+      return '<div class="field"><span class="label">' + oreName + '</span><div class="field-box"><input type="number" step="1" min="0" max="10" class="refinery-input" data-ore="' + oreName + '" value="' + miningState.refinery[oreName] + '"></div></div>';
+    }).join('');
+    return '<div class="ore-group-row" style="grid-template-columns: repeat(' + oresHere.length + ', 1fr);">' + fieldsHtml + '</div>';
+  }).join('');
+
+  panel.innerHTML =
+    '<div class="layout">' +
+      '<div class="card col-input">' +
+        '<div class="section-label">Inputs</div>' +
+        '<div class="field"><span class="label">Base fortune</span><div class="field-box"><input type="number" id="mining-fortune" step="1000" min="0" value="' + miningState.fortune + '"></div></div>' +
+        '<div class="field-row">' +
+          '<div class="field"><span class="label">T4 pot cost</span><div class="field-box"><input type="number" id="mining-potcost" step="1" min="0" value="' + miningState.potCost + '"><span class="suffix">T/stack</span></div></div>' +
+          '<div class="field"><span class="label">AFK duration</span><div class="field-box"><input type="number" id="mining-duration" step="1" min="0" value="' + miningState.duration + '"><span class="suffix">h</span></div></div>' +
+        '</div>' +
+        '<div class="field-row-3">' +
+          '<div class="field"><span class="label">Moon haste</span><div class="field-box"><input type="number" id="mining-haste-moon" step="1" min="0" max="5" value="' + miningState.hasteMoon + '"></div></div>' +
+          '<div class="field"><span class="label">Mars haste</span><div class="field-box"><input type="number" id="mining-haste-mars" step="1" min="0" max="5" value="' + miningState.hasteMars + '"></div></div>' +
+          '<div class="field"><span class="label">Sun haste</span><div class="field-box"><input type="number" id="mining-haste-sun" step="1" min="0" max="5" value="' + miningState.hasteSun + '"></div></div>' +
+        '</div>' +
+        '<div class="field-row">' +
+          '<div class="field"><span class="label">Ram Boost level</span><div class="field-box"><input type="number" id="mining-ram" step="1" min="0" value="' + miningState.ramLevel + '"></div></div>' +
+          '<div class="field"><span class="label">Cash Register</span>' +
+            '<button class="toggle-btn' + (miningState.cashRegister ? ' on' : '') + '" id="mining-cashreg"><span class="toggle-track"><span class="toggle-thumb"></span></span><span id="mining-cashreg-label">' + (miningState.cashRegister ? 'On' : 'Off') + '</span></button>' +
+          '</div>' +
+        '</div>' +
+        '<div class="boxed-section"><span class="boxed-title">Refinery level</span>' + refineryGroupsHtml + '</div>' +
+      '</div>' +
+      '<div class="col-output">' +
+        '<div class="card"><div class="section-label">Planet</div><div class="pills" id="mining-planet-pills">' + planetPillsHtml + '</div>' +
+          '<div style="margin-top:12px;" id="mining-tier-table"></div>' +
+        '</div>' +
+        '<div class="card"><div class="section-label" id="mining-frag-label">Fragments</div><div id="mining-frag-table"></div></div>' +
+        '<div class="footnote">Just rough estimates, doesn\'t account for ping/TPS/etc. Green row = best profit on this planet. Red rows = each ore\'s own best pick (if it\'s not already the green one).</div>' +
+      '</div>' +
+    '</div>';
+
+  document.getElementById('mining-fortune').addEventListener('input', function (e) { miningState.fortune = Number(e.target.value) || 0; refreshMiningPanel(); });
+  document.getElementById('mining-potcost').addEventListener('input', function (e) { miningState.potCost = Number(e.target.value) || 0; refreshMiningPanel(); });
+  document.getElementById('mining-duration').addEventListener('input', function (e) { miningState.duration = Number(e.target.value) || 0; refreshMiningPanel(); });
+  document.getElementById('mining-haste-moon').addEventListener('input', function (e) { miningState.hasteMoon = Math.max(0, Math.min(5, Number(e.target.value) || 0)); refreshMiningPanel(); });
+  document.getElementById('mining-haste-mars').addEventListener('input', function (e) { miningState.hasteMars = Math.max(0, Math.min(5, Number(e.target.value) || 0)); refreshMiningPanel(); });
+  document.getElementById('mining-haste-sun').addEventListener('input', function (e) { miningState.hasteSun = Math.max(0, Math.min(5, Number(e.target.value) || 0)); refreshMiningPanel(); });
+  document.getElementById('mining-ram').addEventListener('input', function (e) { miningState.ramLevel = Math.max(0, Number(e.target.value) || 0); refreshMiningPanel(); });
+  document.getElementById('mining-cashreg').addEventListener('click', function () {
+    miningState.cashRegister = !miningState.cashRegister;
+    this.classList.toggle('on', miningState.cashRegister);
+    document.getElementById('mining-cashreg-label').textContent = miningState.cashRegister ? 'On' : 'Off';
+    refreshMiningPanel();
+  });
+  document.querySelectorAll('.refinery-input').forEach(function (input) {
+    input.addEventListener('input', function (e) {
+      miningState.refinery[e.target.dataset.ore] = Math.max(0, Math.min(10, Number(e.target.value) || 0));
+      refreshMiningPanel();
+    });
+  });
+  document.getElementById('mining-planet-pills').addEventListener('click', function (e) {
+    var clicked = e.target.closest('.pill');
+    if (!clicked) return;
+    miningState.planet = clicked.dataset.planet;
+    document.querySelectorAll('#mining-planet-pills .pill').forEach(function (p) { p.classList.toggle('active', p === clicked); });
+    refreshMiningPanel();
+  });
+
+  refreshMiningPanel();
+}
+
+// base -> + refinery bonus -> + ram boost cut -> x1.03 if cash register is on
+function calcSellPrice(ore) {
+  var refineryLevel = miningState.refinery[ore.name];
+  var refineryBonus = refineryLevel * ore.priceInc;
+  var ramBonus = Math.round(refineryBonus * (miningState.ramLevel * RAM_PERCENT_PER_LEVEL));
+  var total = ore.priceBase + refineryBonus + ramBonus;
+  if (miningState.cashRegister) total = Math.round(total * (1 + CASH_REGISTER_BONUS));
+  return total;
+}
+
+function calcOreTiers(oreName) {
+  var ore = ORE_LIST.filter(function (o) { return o.name === oreName; })[0];
+  var sellQty = Math.floor(miningState.fortune / 100);
+  var costPerFrag = miningState.potCost / 1728;
+
+  var hasteByFamily = { moon: miningState.hasteMoon, mars: miningState.hasteMars, sun: miningState.hasteSun };
+  var hasteLvl = hasteByFamily[ore.haste];
+
+  var sellPrice = calcSellPrice(ore);
+  var blockTime = ore.times[hasteLvl];
+  var blocksPerHour = 3600 / blockTime;
+  var baseRevenue = Math.round((sellQty * sellPrice * blocksPerHour) / 1e12 * 10000) / 10000;
+
+  return TIER_LIST.map(function (tier) {
+    var revenue = baseRevenue * tier.mult;
+    var cost = tier.cost === 0 ? 0 : Math.round(costPerFrag * tier.cost * 100) / 100;
+    var net = revenue - cost;
+    var margin = net / revenue;
+    return {
+      ore: oreName, tier: tier.name, sellPrice: sellPrice, blocksPerHour: blocksPerHour,
+      revenue: revenue, cost: cost, net: net, margin: margin,
+      afkRevenue: revenue * miningState.duration, afkProfit: net * miningState.duration
+    };
+  });
+}
+
+function refreshMiningPanel() {
+  saveState('mst_mining_state', miningState);
+
+  var oreNames = PLANET_ORES[miningState.planet];
+  var rows = [];
+  oreNames.forEach(function (oreName) { rows = rows.concat(calcOreTiers(oreName)); });
+
+  var overallBestRow = 0;
+  rows.forEach(function (r, i) { if (r.net > rows[overallBestRow].net) overallBestRow = i; });
+
+  var bestRowPerOre = {};
+  rows.forEach(function (r, i) {
+    if (!(r.ore in bestRowPerOre) || r.net > rows[bestRowPerOre[r.ore]].net) bestRowPerOre[r.ore] = i;
+  });
+  var oreBestRows = Object.keys(bestRowPerOre)
+    .map(function (k) { return bestRowPerOre[k]; })
+    .filter(function (idx) { return idx !== overallBestRow; });
+
+  // mark where each new ore's block of rows starts, so we can draw a divider line
+  var oreBreakRows = [];
+  rows.forEach(function (r, i) {
+    if (i > 0 && r.ore !== rows[i - 1].ore) oreBreakRows.push(i);
+  });
+
+  document.getElementById('mining-tier-table').innerHTML = renderTable(
+    ["Ore", "Tier", "Sell Price", "Blocks/h", "Revenue/h (T)", "Cost/h (T)", "Net Profit/h (T)", "AFK Profit"],
+    rows.map(function (r) {
+      return [r.ore, r.tier, displayNum(r.sellPrice), displayNum(r.blocksPerHour, 1), displayNum(r.revenue, 4), displayNum(r.cost, 2), displayNum(r.net, 4), displayNum(r.afkProfit, 2)];
+    }),
+    { overallBestRow: overallBestRow, oreBestRows: oreBestRows, oreBreakRows: oreBreakRows, highlightCol: 6 }
+  );
+
+  document.getElementById('mining-frag-label').textContent = "Ores — " + miningState.planet;
+  var fragRows = [];
+  var fragOreBreakRows = [];
+  oreNames.forEach(function (oreName) {
+    var ore = ORE_LIST.filter(function (o) { return o.name === oreName; })[0];
+    var hasteByFamily = { moon: miningState.hasteMoon, mars: miningState.hasteMars, sun: miningState.hasteSun };
+    var hasteLvl = hasteByFamily[ore.haste];
+    var blocksPerHour = 3600 / ore.times[hasteLvl];
+    if (fragRows.length > 0) fragOreBreakRows.push(fragRows.length);
+    ORE_FRAGMENTS[oreName].forEach(function (frag) {
+      var perHour = blocksPerHour / frag.div;
+      fragRows.push([oreName, frag.name, displayNum(perHour, 3), displayNum(Math.round(perHour * miningState.duration))]);
+    });
+  });
+  document.getElementById('mining-frag-table').innerHTML = renderTable(
+    ["Ore", "Fragment", "Frags / hour", "Projected AFK amount"],
+    fragRows,
+    { oreBreakRows: fragOreBreakRows }
+  );
+}
+
+/* ============================
+   TAB 3 - Pets
+   ============================ */
+
+function sumOfSquares(n) {
+  if (n < 0) return 0;
+  return (n * (n + 1) * (2 * n + 1)) / 6;
+}
+
+var EXPEDITION_LIST = [
+  { name: "Greenfield Journey", baseTime: 0.5, exp: 15 },
+  { name: "Dunes of Discovery", baseTime: 1, exp: 80 },
+  { name: "Whisper of the lost path", baseTime: 1.5, exp: 400 },
+  { name: "Frostpeak Expedition", baseTime: 2, exp: 1400 },
+  { name: "Crate Core Expedition", baseTime: 2.5, exp: 3500 },
+  { name: "Echoing Tunnels", baseTime: 2, exp: 65 },
+  { name: "Granite Passage", baseTime: 4, exp: 350 },
+  { name: "The Quartz Choir", baseTime: 6, exp: 1700 },
+  { name: "Tidal Wave Venture", baseTime: 8, exp: 6800 },
+  { name: "Starlight Surge", baseTime: 10, exp: 14500 },
+  { name: "Shimmering Depths", baseTime: 8, exp: 300 },
+  { name: "Pyramid of Echoes", baseTime: 12, exp: 1100 },
+  { name: "Bones in the Brickworld", baseTime: 16, exp: 5400 },
+  { name: "Frozen Diamond Veins", baseTime: 20, exp: 13600 },
+  { name: "Greenhouse Quest", baseTime: 24, exp: 34000 }
+];
+
+var EVOLUTION_LIST = [
+  { name: "T1", mult: 1, div: 40 },
+  { name: "T2", mult: 3, div: 130 },
+  { name: "T3", mult: 5, div: 250 },
+  { name: "T4", mult: 9, div: 600 },
+  { name: "T5", mult: 18, div: 1500 }
+];
+
+var petState = loadState('mst_pet_state', { curLevel: 1, targetLevel: 100, atl: 0, pwl: 0 });
+
+function buildPetPanel() {
+  var panel = document.getElementById('panel-pets');
+
+  panel.innerHTML =
+    '<div class="layout">' +
+      '<div class="card col-input">' +
+        '<div class="section-label">Pet progress</div>' +
+        '<div class="field"><span class="label">Current pet level</span><div class="field-box"><input type="number" id="pets-cur" step="1" min="1" value="' + petState.curLevel + '"></div></div>' +
+        '<div class="field"><span class="label">Target level</span><div class="field-box"><input type="number" id="pets-target" step="1" min="1" value="' + petState.targetLevel + '"></div></div>' +
+        '<div class="field-row">' +
+          '<div class="field"><span class="label">Adventure time lvl</span><div class="field-box"><input type="number" id="pets-atl" step="1" min="0" value="' + petState.atl + '"><span class="suffix">%</span></div></div>' +
+          '<div class="field"><span class="label">Pet wisdom lvl</span><div class="field-box"><input type="number" id="pets-pwl" step="1" min="0" value="' + petState.pwl + '"><span class="suffix">%</span></div></div>' +
+        '</div>' +
+        '<div class="boxed-section" id="pets-exp-stat"></div>' +
+      '</div>' +
+      '<div class="col-output" id="pets-output"></div>' +
+    '</div>';
+
+  document.getElementById('pets-cur').addEventListener('input', function (e) { petState.curLevel = Number(e.target.value) || 1; refreshPetPanel(); });
+  document.getElementById('pets-target').addEventListener('input', function (e) { petState.targetLevel = Number(e.target.value) || 1; refreshPetPanel(); });
+  document.getElementById('pets-atl').addEventListener('input', function (e) { petState.atl = Number(e.target.value) || 0; refreshPetPanel(); });
+  document.getElementById('pets-pwl').addEventListener('input', function (e) { petState.pwl = Number(e.target.value) || 0; refreshPetPanel(); });
+
+  refreshPetPanel();
+}
+
+function refreshPetPanel() {
+  saveState('mst_pet_state', petState);
+
+  var neededExp = petState.curLevel >= petState.targetLevel
+    ? 0
+    : 100 * (sumOfSquares(petState.targetLevel) - sumOfSquares(petState.curLevel - 1)) - Math.pow(petState.curLevel, 2) * 100;
+
+  document.getElementById('pets-exp-stat').innerHTML = statTile("Exp needed", displayNum(neededExp), true);
+
+  var outputEl = document.getElementById('pets-output');
+  if (neededExp === 0) {
+    outputEl.innerHTML = '<div class="card"><span style="color: var(--text-dim); font-size: 13px;">Target level is at or below the current level, so no more exp is needed.</span></div>';
+    return;
+  }
+
+  var expeditionRows = EXPEDITION_LIST.map(function (trip) {
+    var time = trip.baseTime * (1 - petState.atl / 100);
+    var expPerHour = trip.exp / time;
+    var runsNeeded = Math.ceil(neededExp / trip.exp);
+    var daysNeeded = (runsNeeded * time) / 24;
+    return { name: trip.name, time: time, expPerHour: expPerHour, runs: runsNeeded, days: daysNeeded };
+  }).sort(function (a, b) { return a.days - b.days; });
+
+  var evoResults = EVOLUTION_LIST.map(function (evo) {
+    var spiritsNeeded = Math.ceil((neededExp / (evo.div * (1 + petState.pwl / 100))) * evo.mult);
+    var stacksNeeded = spiritsNeeded / evo.mult / 64;
+    return { name: evo.name, spirits: spiritsNeeded, stacks: stacksNeeded };
+  });
+
+  var spiritsTableHtml = renderTable(
+    [""].concat(evoResults.map(function (e) { return e.name; })),
+    [
+      ["Spirits needed"].concat(evoResults.map(function (e) { return displayNum(e.spirits); })),
+      ["Stacks needed"].concat(evoResults.map(function (e) { return displayNum(e.stacks, 2); }))
+    ]
+  );
+
+  outputEl.innerHTML =
+    '<div class="card"><div class="section-label">Spirits Needed</div>' + spiritsTableHtml + '</div>' +
+    '<div class="card"><div class="section-label">Expeditions, fastest first</div>' +
+      renderTable(["Expedition", "Time (h)", "Exp / hour", "Runs needed", "Days needed"],
+        expeditionRows.map(function (e) { return [e.name, displayNum(e.time, 2), displayNum(e.expPerHour, 1), displayNum(e.runs), displayNum(e.days, 1)]; })) +
+    '</div>';
+}
+
+/* go */
+buildCombatPanel();
+buildMiningPanel();
+buildPetPanel();
+</script>
+</body>
+</html>

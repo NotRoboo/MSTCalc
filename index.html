@@ -6,7 +6,7 @@
 <title>MST Calculators</title>
 <style>
   :root {
-    color-scheme: dark; /* keeps dropdowns dark instead of that ugly white default */
+    color-scheme: dark;
     --bg: #0a0a0b;
     --surface: #131316;
     --surface2: #1a1a1e;
@@ -96,15 +96,12 @@
   }
   .toggle-btn.on .toggle-thumb { left: 14px; }
 
-  /* boxed sub-section, just to visually split stuff up a bit without another whole card */
   .boxed-section {
     border: 1px solid var(--border); background: var(--surface3);
     border-radius: 8px; padding: 10px 11px; margin-top: 12px;
   }
   .boxed-section > .boxed-title { font-size: 12.5px; color: var(--text-dim); display: block; margin-bottom: 8px; }
 
-  /* ore-group row inside the refinery box - all ores of one planet fit on one line,
-     styled the same as the regular field/field-box combo used elsewhere */
   .ore-group-row { display: grid; gap: 8px; margin-bottom: 8px; }
   .ore-group-row:last-child { margin-bottom: 0; }
 
@@ -114,6 +111,10 @@
     border-radius: 8px; padding: 9px 11px;
   }
   .stat.accent { border-color: var(--border-red); }
+  .pet-row { grid-template-columns: repeat(3, minmax(0, 1fr)); width: 60%; min-width: 340px; max-width: 100%; margin: 9px auto 0; }
+  .best-row { grid-template-columns: repeat(2, minmax(0, 1fr)); margin-top: 9px; }
+  #pve-mob-stats .stat, .pet-row .stat, .best-row .stat { text-align: center; }
+  .best-row .stat .sub { font-size: 12px; color: var(--text); }
   .stat .label { font-size: 11px; color: var(--text-dim); margin-bottom: 4px; }
   .stat .value { font-family: var(--mono); font-size: 15px; font-weight: 600; color: var(--text); }
   .stat.accent .value { color: var(--red); }
@@ -124,18 +125,25 @@
     border: 1px solid var(--border); background: transparent; color: var(--text-dim); cursor: pointer;
   }
   .pill.active { border-color: var(--red); background: var(--red-glow); color: var(--red); }
+
+  .card-head { display: flex; justify-content: space-between; align-items: flex-start; gap: 12px; flex-wrap: wrap; margin-bottom: 10px; }
+  .card-head .section-label { margin-bottom: 0; }
+  .legend { display: flex; gap: 14px; flex-wrap: wrap; font-size: 11.5px; color: var(--text-dim); }
+  .legend-item { display: flex; align-items: center; gap: 6px; }
+  .swatch { width: 10px; height: 10px; border-radius: 3px; display: inline-block; }
+  .swatch.green { background: var(--green); }
+  .swatch.red { background: var(--red); }
+
   table { width: 100%; border-collapse: collapse; font-size: 12px; }
   th { text-align: right; color: var(--text-dim); font-weight: 500; padding: 6px 8px; border-bottom: 1px solid var(--border); white-space: nowrap; }
   th:first-child { text-align: left; }
   td { padding: 6px 8px; border-bottom: 1px solid var(--border); text-align: right; color: var(--text-dim); font-family: var(--mono); font-size: 11.5px; }
   td:first-child { text-align: left; color: var(--text); font-family: system-ui, sans-serif; font-size: 12px; }
 
-  /* green = best on the whole planet, red = best for that one ore */
   tr.row-best-overall td { background: var(--green-row); }
   tr.row-best-overall td.hl { color: var(--green); font-weight: 600; }
   tr.row-best-in-ore td { background: var(--red-row); }
   tr.row-best-in-ore td.hl { color: var(--red); font-weight: 600; }
-  /* clear break where one ore's rows end and the next ore's rows start */
   tr.ore-break td { border-top: 3px solid var(--text-faint); padding-top: 10px; }
 
   .table-scroll { overflow-x: auto; }
@@ -149,19 +157,17 @@
 <div class="wrap">
   <div class="brand"><div class="mark"></div><h1>MST Calculators</h1></div>
   <div class="tabs" id="tabs">
-    <button class="tab-btn active" data-tab="pve">T5 PvE</button>
-    <button class="tab-btn" data-tab="profit">Mining Profit</button>
+    <button class="tab-btn" data-tab="pve">T5 PvE</button>
+    <button class="tab-btn active" data-tab="profit">Mining Profit</button>
     <button class="tab-btn" data-tab="pets">Pets</button>
   </div>
 
-  <div class="tab-panel active" id="panel-pve"></div>
-  <div class="tab-panel" id="panel-profit"></div>
+  <div class="tab-panel" id="panel-pve"></div>
+  <div class="tab-panel active" id="panel-profit"></div>
   <div class="tab-panel" id="panel-pets"></div>
 </div>
 
 <script>
-/* random helpers i use everywhere, nothing special */
-
 function displayNum(value, decimals) {
   decimals = decimals || 0;
   if (value === "" || value === null || value === undefined || !isFinite(value)) return "—";
@@ -174,7 +180,6 @@ function displayPct(value, decimals) {
   return (value * 100).toLocaleString("en-US", { minimumFractionDigits: decimals, maximumFractionDigits: decimals }) + "%";
 }
 
-// spits out a <table>. opts can have overallBestRow / oreBestRows / oreBreakRows / highlightCol
 function renderTable(headers, rows, opts) {
   opts = opts || {};
   var oreBestRows = opts.oreBestRows || [];
@@ -200,17 +205,16 @@ function renderTable(headers, rows, opts) {
   return out;
 }
 
-function statTile(label, value, accented, footnote) {
-  return '<div class="stat' + (accented ? ' accent' : '') + '">' +
+function statTile(label, value, accented, footnote, wide) {
+  return '<div class="stat' + (accented ? ' accent' : '') + (wide ? ' wide' : '') + '">' +
     '<div class="label">' + label + '</div>' +
     '<div class="value">' + value + '</div>' +
     (footnote ? '<div class="sub">' + footnote + '</div>' : '') +
     '</div>';
 }
 
-// saves your inputs to the browser so they're still there next time you open the page
 function saveState(key, state) {
-  try { localStorage.setItem(key, JSON.stringify(state)); } catch (e) { /* meh, whatever */ }
+  try { localStorage.setItem(key, JSON.stringify(state)); } catch (e) {}
 }
 function loadState(key, defaults) {
   try {
@@ -222,7 +226,6 @@ function loadState(key, defaults) {
   }
 }
 
-/* tab clicking */
 document.getElementById('tabs').addEventListener('click', function (evt) {
   var clicked = evt.target.closest('.tab-btn');
   if (!clicked) return;
@@ -231,10 +234,6 @@ document.getElementById('tabs').addEventListener('click', function (evt) {
   document.querySelectorAll('.tab-panel').forEach(function (panel) { panel.classList.remove('active'); });
   document.getElementById('panel-' + targetTab).classList.add('active');
 });
-
-/* ============================
-   TAB 1 - T5 PvE
-   ============================ */
 
 var WEAPON_DAMAGE = {
   "Volcanic pickaxe": 260000, "Basic Bludgeon": 285000, "Handy Bludgeon": 320000,
@@ -284,7 +283,7 @@ function buildCombatPanel() {
         '<div class="boxed-section" id="pve-damage-stats"></div>' +
       '</div>' +
       '<div class="col-output">' +
-        '<div class="card"><div class="section-label">Target</div><div class="pills" id="pve-mob-pills">' + mobPillsHtml + '</div><div class="stat-grid" id="pve-mob-stats" style="margin-top:11px;"></div></div>' +
+        '<div class="card"><div class="section-label">Target</div><div class="pills" id="pve-mob-pills">' + mobPillsHtml + '</div><div class="stat-grid" id="pve-mob-stats" style="margin-top:11px;"></div><div class="stat-grid pet-row" id="pve-pet-stats"></div><div class="stat-grid best-row" id="pve-best-keys"></div></div>' +
         '<div class="card"><div class="section-label">Ash & keys per hour</div><div id="pve-ash-table"></div></div>' +
         '<div class="card"><div class="section-label">Hours to drop</div><div id="pve-drop-table"></div></div>' +
         '<div class="footnote">These figures assume every drop lands exactly on the stated kill count. Real drop rates are probabilistic, so actual results will vary from these estimates.</div>' +
@@ -313,23 +312,44 @@ function buildCombatPanel() {
   refreshCombatPanel();
 }
 
+function calcPetRates(mob, hitDamage) {
+  var hitsNoPet = Math.ceil(mob.hp / hitDamage);
+  var hitsWithSerpent = Math.ceil(mob.hp * (1 - 0.0025 * combatState.serpentLvl) / hitDamage);
+  var noPet = (combatState.cps / hitsNoPet) * 3600;
+  return {
+    hitsNoPet: hitsNoPet,
+    pets: [
+      { label: "No pet", kph: noPet },
+      { label: "Dragon", kph: noPet * (1 + combatState.dragonLvl * 0.0025) },
+      { label: "Serpent", kph: (combatState.cps / hitsWithSerpent) * 3600 }
+    ]
+  };
+}
+
 function refreshCombatPanel() {
   saveState('mst_combat_state', combatState);
 
   var baseDamage = WEAPON_DAMAGE[combatState.weapon];
   var hitDamage = baseDamage * 2.05 * (1 + combatState.upgrade / 100) * (combatState.autumn ? 1.5 : 1);
   var mob = MOB_LIST[combatState.mobIdx];
-  var hpWithSerpent = mob.hp * (1 - 0.0025 * combatState.serpentLvl);
-  var hitsNoPet = Math.ceil(mob.hp / hitDamage);
-  var hitsWithSerpent = Math.ceil(hpWithSerpent / hitDamage);
-  var killsPerHourNoPet = (combatState.cps / hitsNoPet) * 3600;
-  var killsPerHourDragon = killsPerHourNoPet * (1 + combatState.dragonLvl * 0.0025);
-  var killsPerHourSerpent = (combatState.cps / hitsWithSerpent) * 3600;
-  var petRows = [
-    { label: "No pet", kph: killsPerHourNoPet },
-    { label: "Dragon", kph: killsPerHourDragon },
-    { label: "Serpent", kph: killsPerHourSerpent }
-  ];
+  var rates = calcPetRates(mob, hitDamage);
+  var hitsNoPet = rates.hitsNoPet;
+  var petRows = rates.pets;
+
+  var bestT4 = null;
+  var bestT5 = null;
+  MOB_LIST.forEach(function (m) {
+    var pets = calcPetRates(m, hitDamage).pets;
+    var top = pets.reduce(function (a, b) { return b.kph > a.kph ? b : a; });
+    var entry = { mob: m.name, pet: top.label, t4: top.kph / m.perT4, t5: top.kph / m.perT5 };
+    if (!bestT4 || entry.t4 > bestT4.t4) bestT4 = entry;
+    if (!bestT5 || entry.t5 > bestT5.t5) bestT5 = entry;
+  });
+
+  function bestKeyTile(label, entry) {
+    return statTile(label, entry.mob, true,
+      'T4 ' + displayNum(entry.t4, 2) + '/hr · T5 ' + displayNum(entry.t5, 2) + '/hr · ' + entry.pet);
+  }
 
   document.getElementById('pve-damage-stats').innerHTML =
     statTile("Base damage", displayNum(baseDamage)) +
@@ -341,10 +361,15 @@ function refreshCombatPanel() {
     statTile("Hits to kill", displayNum(hitsNoPet)) +
     statTile("Ash per kill", displayNum(mob.ash)) +
     statTile("Kills per T4 key", displayNum(mob.perT4)) +
-    statTile("Kills per T5 key", displayNum(mob.perT5)) +
-    petRows.map(function (p) {
-      return statTile(p.label + " kills/hr", displayNum(Math.round(p.kph * 100) / 100, 2), p.label !== "No pet");
-    }).join('');
+    statTile("Kills per T5 key", displayNum(mob.perT5));
+
+  document.getElementById('pve-pet-stats').innerHTML = petRows.map(function (p) {
+    return statTile(p.label + " kills/hr", displayNum(Math.round(p.kph * 100) / 100, 2), p.label !== "No pet");
+  }).join('');
+
+  document.getElementById('pve-best-keys').innerHTML =
+    bestKeyTile("Best T4 keys", bestT4) +
+    bestKeyTile("Best T5 keys", bestT5);
 
   document.getElementById('pve-ash-table').innerHTML = renderTable(
     ["Pet", "Ash/hr", "T4 keys/hr", "T5 keys/hr"],
@@ -360,13 +385,6 @@ function refreshCombatPanel() {
     })
   );
 }
-
-/* ============================
-   TAB 2 - Mining Profit
-   Moon, Mars, Sun ores. Sell price math is base -> refinery bonus
-   -> ram boost bump -> cash register bump, same order as the actual
-   game logic.
-   ============================ */
 
 var ORE_LIST = [
   { name: "Basalt", priceBase: 75000, priceInc: 1875, haste: "moon", times: [1.5, 1.3, 1.2, 1.05, 1, 0.9] },
@@ -386,6 +404,14 @@ var TIER_LIST = [
   { name: "T4", mult: 6, cost: 1296 }
 ];
 
+var MAX_TIER_OPTIONS = [
+  { label: "All", value: 4 },
+  { label: "T3", value: 3 },
+  { label: "T2", value: 2 },
+  { label: "T1", value: 1 },
+  { label: "Base", value: 0 }
+];
+
 var ORE_FRAGMENTS = {
   "Basalt": [{ name: "Lunar Frag", div: 500 }, { name: "Basalt Shard", div: 1000 }, { name: "Chisilite Shard", div: 1000 }],
   "Brecca": [{ name: "Lunar Frag", div: 500 }, { name: "Chisilite Shard", div: 1000 }, { name: "Brecca Powder", div: 2000 }],
@@ -402,7 +428,6 @@ var PLANET_ORES = {
   "Sun": ["Cosmic Fiber", "Crimson Plasma"]
 };
 
-// % that each ram level adds to your refinery bonus
 var RAM_PERCENT_PER_LEVEL = 0.02;
 var CASH_REGISTER_BONUS = 0.03;
 
@@ -411,7 +436,9 @@ var miningState = loadState('mst_mining_state', {
   refinery: { "Basalt": 0, "Brecca": 0, "Regolith": 0, "Amber Rock": 0, "Amber Crystal": 0, "Cosmic Fiber": 0, "Crimson Plasma": 0 },
   hasteMoon: 1, hasteMars: 1, hasteSun: 1,
   ramLevel: 0,
+  ravenLevel: 0,
   cashRegister: false,
+  maxTier: 4,
   potCost: 150, duration: 24, planet: "Moon"
 });
 
@@ -421,8 +448,10 @@ function buildMiningPanel() {
     return '<button class="pill' + (planetName === miningState.planet ? ' active' : '') + '" data-planet="' + planetName + '">' + planetName + '</button>';
   }).join('');
 
-  // refinery inputs grouped so every ore on the same planet sits on one row -
-  // no need to label which planet is which, the ore names already make it obvious
+  var maxTierOptionsHtml = MAX_TIER_OPTIONS.map(function (opt) {
+    return '<option value="' + opt.value + '"' + (opt.value === miningState.maxTier ? ' selected' : '') + '>' + opt.label + '</option>';
+  }).join('');
+
   var refineryGroupsHtml = Object.keys(PLANET_ORES).map(function (planetName) {
     var oresHere = PLANET_ORES[planetName];
     var fieldsHtml = oresHere.map(function (oreName) {
@@ -447,18 +476,24 @@ function buildMiningPanel() {
         '</div>' +
         '<div class="field-row">' +
           '<div class="field"><span class="label">Ram Boost level</span><div class="field-box"><input type="number" id="mining-ram" step="1" min="0" value="' + miningState.ramLevel + '"></div></div>' +
+          '<div class="field"><span class="label">Raven level</span><div class="field-box"><input type="number" id="mining-raven" step="1" min="0" max="100" value="' + miningState.ravenLevel + '"></div></div>' +
+        '</div>' +
+        '<div class="field-row">' +
           '<div class="field"><span class="label">Cash Register</span>' +
             '<button class="toggle-btn' + (miningState.cashRegister ? ' on' : '') + '" id="mining-cashreg"><span class="toggle-track"><span class="toggle-thumb"></span></span><span id="mining-cashreg-label">' + (miningState.cashRegister ? 'On' : 'Off') + '</span></button>' +
           '</div>' +
+          '<div class="field"><span class="label">Max potion tier</span><div class="field-box"><select id="mining-maxtier">' + maxTierOptionsHtml + '</select></div></div>' +
         '</div>' +
         '<div class="boxed-section"><span class="boxed-title">Refinery level</span>' + refineryGroupsHtml + '</div>' +
       '</div>' +
       '<div class="col-output">' +
-        '<div class="card"><div class="section-label">Planet</div><div class="pills" id="mining-planet-pills">' + planetPillsHtml + '</div>' +
+        '<div class="card"><div class="card-head"><div class="section-label">Planet</div>' +
+          '<div class="legend"><span class="legend-item"><span class="swatch green"></span>best for planet</span><span class="legend-item"><span class="swatch red"></span>best for ore</span></div></div>' +
+          '<div class="pills" id="mining-planet-pills">' + planetPillsHtml + '</div>' +
           '<div style="margin-top:12px;" id="mining-tier-table"></div>' +
         '</div>' +
         '<div class="card"><div class="section-label" id="mining-frag-label">Fragments</div><div id="mining-frag-table"></div></div>' +
-        '<div class="footnote">Just rough estimates, doesn\'t account for ping/TPS/etc. Green row = best profit on this planet. Red rows = each ore\'s own best pick (if it\'s not already the green one).</div>' +
+        '<div class="footnote">Just rough estimates, doesn\'t account for ping/TPS/etc. Highlights only consider potion tiers up to your max potion tier. Fragment amounts include the Raven chance for a bonus drop.</div>' +
       '</div>' +
     '</div>';
 
@@ -469,6 +504,8 @@ function buildMiningPanel() {
   document.getElementById('mining-haste-mars').addEventListener('input', function (e) { miningState.hasteMars = Math.max(0, Math.min(5, Number(e.target.value) || 0)); refreshMiningPanel(); });
   document.getElementById('mining-haste-sun').addEventListener('input', function (e) { miningState.hasteSun = Math.max(0, Math.min(5, Number(e.target.value) || 0)); refreshMiningPanel(); });
   document.getElementById('mining-ram').addEventListener('input', function (e) { miningState.ramLevel = Math.max(0, Number(e.target.value) || 0); refreshMiningPanel(); });
+  document.getElementById('mining-raven').addEventListener('input', function (e) { miningState.ravenLevel = Math.max(0, Math.min(100, Number(e.target.value) || 0)); refreshMiningPanel(); });
+  document.getElementById('mining-maxtier').addEventListener('change', function (e) { miningState.maxTier = Number(e.target.value); refreshMiningPanel(); });
   document.getElementById('mining-cashreg').addEventListener('click', function () {
     miningState.cashRegister = !miningState.cashRegister;
     this.classList.toggle('on', miningState.cashRegister);
@@ -492,7 +529,6 @@ function buildMiningPanel() {
   refreshMiningPanel();
 }
 
-// base -> + refinery bonus -> + ram boost cut -> x1.03 if cash register is on
 function calcSellPrice(ore) {
   var refineryLevel = miningState.refinery[ore.name];
   var refineryBonus = refineryLevel * ore.priceInc;
@@ -515,13 +551,13 @@ function calcOreTiers(oreName) {
   var blocksPerHour = 3600 / blockTime;
   var baseRevenue = Math.round((sellQty * sellPrice * blocksPerHour) / 1e12 * 10000) / 10000;
 
-  return TIER_LIST.map(function (tier) {
+  return TIER_LIST.map(function (tier, tierIdx) {
     var revenue = baseRevenue * tier.mult;
     var cost = tier.cost === 0 ? 0 : Math.round(costPerFrag * tier.cost * 100) / 100;
     var net = revenue - cost;
     var margin = net / revenue;
     return {
-      ore: oreName, tier: tier.name, sellPrice: sellPrice, blocksPerHour: blocksPerHour,
+      ore: oreName, tier: tier.name, tierIdx: tierIdx, sellPrice: sellPrice, blocksPerHour: blocksPerHour,
       revenue: revenue, cost: cost, net: net, margin: margin,
       afkRevenue: revenue * miningState.duration, afkProfit: net * miningState.duration
     };
@@ -535,18 +571,21 @@ function refreshMiningPanel() {
   var rows = [];
   oreNames.forEach(function (oreName) { rows = rows.concat(calcOreTiers(oreName)); });
 
-  var overallBestRow = 0;
-  rows.forEach(function (r, i) { if (r.net > rows[overallBestRow].net) overallBestRow = i; });
+  var overallBestRow = -1;
+  rows.forEach(function (r, i) {
+    if (r.tierIdx > miningState.maxTier) return;
+    if (overallBestRow === -1 || r.net > rows[overallBestRow].net) overallBestRow = i;
+  });
 
   var bestRowPerOre = {};
   rows.forEach(function (r, i) {
+    if (r.tierIdx > miningState.maxTier) return;
     if (!(r.ore in bestRowPerOre) || r.net > rows[bestRowPerOre[r.ore]].net) bestRowPerOre[r.ore] = i;
   });
   var oreBestRows = Object.keys(bestRowPerOre)
     .map(function (k) { return bestRowPerOre[k]; })
     .filter(function (idx) { return idx !== overallBestRow; });
 
-  // mark where each new ore's block of rows starts, so we can draw a divider line
   var oreBreakRows = [];
   rows.forEach(function (r, i) {
     if (i > 0 && r.ore !== rows[i - 1].ore) oreBreakRows.push(i);
@@ -561,6 +600,7 @@ function refreshMiningPanel() {
   );
 
   document.getElementById('mining-frag-label').textContent = "Ores — " + miningState.planet;
+  var ravenMult = 1 + miningState.ravenLevel / 100;
   var fragRows = [];
   var fragOreBreakRows = [];
   oreNames.forEach(function (oreName) {
@@ -570,7 +610,7 @@ function refreshMiningPanel() {
     var blocksPerHour = 3600 / ore.times[hasteLvl];
     if (fragRows.length > 0) fragOreBreakRows.push(fragRows.length);
     ORE_FRAGMENTS[oreName].forEach(function (frag) {
-      var perHour = blocksPerHour / frag.div;
+      var perHour = (blocksPerHour / frag.div) * ravenMult;
       fragRows.push([oreName, frag.name, displayNum(perHour, 3), displayNum(Math.round(perHour * miningState.duration))]);
     });
   });
@@ -580,10 +620,6 @@ function refreshMiningPanel() {
     { oreBreakRows: fragOreBreakRows }
   );
 }
-
-/* ============================
-   TAB 3 - Pets
-   ============================ */
 
 function sumOfSquares(n) {
   if (n < 0) return 0;
@@ -689,7 +725,6 @@ function refreshPetPanel() {
     '</div>';
 }
 
-/* go */
 buildCombatPanel();
 buildMiningPanel();
 buildPetPanel();
